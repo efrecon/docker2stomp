@@ -12,7 +12,9 @@ set prg_args {
     -cafile   ""          "Path to CA file, if relevant"
     -certfile ""          "Path to cert file, if relevant"
     -keyfile  ""          "Path to key file, if relevant"
-    -mapper   {}          "Mapping from component names/ids to topics"
+    -mapper   {}          "Mapping from container names/ids to topics"
+    -output   stdout      "Which output of the docker containers to listen to"
+    -retry    5000        "Milliseconds between container attachment retries"
 }
 
 
@@ -84,9 +86,18 @@ if { [llength $argv] > 0 } {
     ::help:dump "$argv are unknown arguments!"
 }
 
-proc ::forward { component topic type line } {
+proc ::forward { container topic type line } {
     global FWD
 
+    if { $type eq "error" } {
+	docker log WARN "Connection to $container lost,\
+                         retrying in $FWD(-retry) ms"
+	if { $FWD(-retry) >= 0 } {
+	    after $FWD(-retry) [list ::init $container $url]
+	}
+	return
+    }
+    
     if { $line ne "" } {
 	::stomp::client::send $FWD(client) $topic \
 	    -body $line \
@@ -94,17 +105,50 @@ proc ::forward { component topic type line } {
     }
 }
 
-
-proc ::init { msg } {
+proc ::attach { container url } {
+    global DOCKER
     global FWD
 
-    # Connect to docker
-    set FWD(docker) [docker connect $FWD(-docker)]
+    if { [catch {$DOCKER($container) inspect $container} descr] } {
+	if { $FWD(-retry) >= 0 } {
+	    docker log DEBUG "No container, retrying in $FWD(-retry) ms"
+	    after $FWD(-retry) [list ::attach $container $url]
+	}
+    } elseif { [dict exists $descr State Running] \
+		   && [string is true [dict get $descr State Running]] } {
+	docker log NOTICE "Attaching to container $container\
+                           on $FWD(-output)"
+	$DOCKER($container) attach $container \
+	    [list ::forward $container $url] \
+	    stream 1 $FWD(-output) 1
+    } elseif { $FWD(-retry) >= 0 } {
+	docker log DEBUG "No container, retrying in $FWD(-retry) ms"
+	after $FWD(-retry) [list ::attach $container $url]
+    }
+}
 
-    # Enumerate components
-    foreach { component topic } $FWD(-mapper) {
-	$FWD(docker) attach $component [list ::forward $component $topic] \
-	    stream 1 stdout 1
+
+proc ::init { container url } {
+    global DOCKER
+    global FWD
+
+    # Disconnect if we already have a connection
+    if { [info exists DOCKER($container)] } {
+	$DOCKER($container) disconnect
+	unset DOCKER($container)
+    }
+
+    set DOCKER($container) [docker connect $FWD(-docker)]
+    ::attach $container $url
+    return $DOCKER($container)
+}
+
+proc ::init:stomp { msg } {
+    global FWD
+
+    # Enumerate containers
+    foreach { container topic } $FWD(-mapper) {
+	::init $container $url
     }
 }
 
@@ -140,6 +184,6 @@ if { [string is true $FWD(-tls)] } {
 			 -user $FWD(-user) \
 			 -password $FWD(-password)]
 }
-::stomp::client::handler $FWD(client) ::init CONNECTED
+::stomp::client::handler $FWD(client) ::init:stomp CONNECTED
 
 vwait forever
