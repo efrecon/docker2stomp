@@ -97,7 +97,7 @@ proc ::forward { container topic type line } {
 	}
 	return
     }
-    
+
     if { $line ne "" } {
 	::stomp::client::send $FWD(client) $topic \
 	    -body $line \
@@ -105,30 +105,30 @@ proc ::forward { container topic type line } {
     }
 }
 
-proc ::attach { container url } {
+proc ::attach { container topic } {
     global DOCKER
     global FWD
 
     if { [catch {$DOCKER($container) inspect $container} descr] } {
 	if { $FWD(-retry) >= 0 } {
 	    docker log DEBUG "No container, retrying in $FWD(-retry) ms"
-	    after $FWD(-retry) [list ::attach $container $url]
+	    after $FWD(-retry) [list ::attach $container $topic]
 	}
     } elseif { [dict exists $descr State Running] \
 		   && [string is true [dict get $descr State Running]] } {
 	docker log NOTICE "Attaching to container $container\
                            on $FWD(-output)"
 	$DOCKER($container) attach $container \
-	    [list ::forward $container $url] \
+	    [list ::forward $container $topic] \
 	    stream 1 $FWD(-output) 1
     } elseif { $FWD(-retry) >= 0 } {
 	docker log DEBUG "No container, retrying in $FWD(-retry) ms"
-	after $FWD(-retry) [list ::attach $container $url]
+	after $FWD(-retry) [list ::attach $container $topic]
     }
 }
 
 
-proc ::init { container url } {
+proc ::init { container topic } {
     global DOCKER
     global FWD
 
@@ -139,7 +139,7 @@ proc ::init { container url } {
     }
 
     set DOCKER($container) [docker connect $FWD(-docker)]
-    ::attach $container $url
+    ::attach $container $topic
     return $DOCKER($container)
 }
 
@@ -148,7 +148,7 @@ proc ::init:stomp { msg } {
 
     # Enumerate containers
     foreach { container topic } $FWD(-mapper) {
-	::init $container $url
+	::init $container $topic
     }
 }
 
