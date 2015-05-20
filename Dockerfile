@@ -3,19 +3,18 @@ MAINTAINER Emmanuel Frecon <emmanuel@sics.se>
 
 # COPY code
 COPY stomper.tcl /opt/docker2stomp/
-RUN mkdir /opt/docker2stomp/lib
 
 # Install git so we can install dependencies
-RUN apk add --update-cache git
-
-# Install tsdb into /opt and til in the lib subdirectory
-WORKDIR /tmp
-RUN git clone https://github.com/efrecon/tcl-stomp
-RUN mv /tmp/tcl-stomp/lib/stomp /opt/docker2stomp/lib/
-RUN git clone https://github.com/efrecon/docker-client
-RUN mv /tmp/docker-client/docker /opt/docker2stomp/lib/
-RUN rm -rf /var/cache/apk/*
-WORKDIR /opt/docker2stomp
+RUN mkdir /opt/docker2stomp/lib && \
+    apk add --update-cache git && \
+    git clone https://github.com/efrecon/tcl-stomp /tmp/tcl-stomp && \
+    rm -rf /tmp/tcl-stomp/.git && \
+    mv /tmp/tcl-stomp/lib/stomp /opt/docker2stomp/lib/ && \
+    git clone https://github.com/efrecon/docker-client /tmp/docker-client && \
+    rm -rf /tmp/docker-client/.git && \
+    mv /tmp/docker-client/docker /opt/docker2stomp/lib/ && \
+    apk del git && \
+    rm -rf /var/cache/apk/*
 
 VOLUME ["/tmp/docker.sock"]
 
