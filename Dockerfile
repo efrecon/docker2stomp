@@ -18,5 +18,4 @@ RUN mkdir /opt/docker2stomp/lib && \
 
 VOLUME ["/tmp/docker.sock"]
 
-ENTRYPOINT ["tclsh8.6", "/opt/docker2stomp/stomper.tcl", "-docker", "unix:///tmp/docker.sock"]
-CMD ["-verbose", "3"]
+ENTRYPOINT ["tclsh8.6", "/opt/docker2stomp/stomper.tcl", "-docker", "unix:///tmp/docker.sock", "-verbose", "3"]
