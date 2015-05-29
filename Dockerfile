@@ -4,9 +4,10 @@ MAINTAINER Emmanuel Frecon <emmanuel@sics.se>
 # COPY code
 COPY stomper.tcl /opt/docker2stomp/
 
-# Install git so we can install dependencies
+# Install git so we can install dependencies and install socat so we
+# can talk to the docker daemon.
 RUN mkdir /opt/docker2stomp/lib && \
-    apk add --update-cache git && \
+    apk add --update-cache git socat && \
     git clone https://github.com/efrecon/tcl-stomp /tmp/tcl-stomp && \
     rm -rf /tmp/tcl-stomp/.git && \
     mv /tmp/tcl-stomp/lib/stomp /opt/docker2stomp/lib/ && \

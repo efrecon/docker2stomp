@@ -109,6 +109,7 @@ proc ::attach { container topic } {
     global DOCKER
     global FWD
 
+    docker log INFO "Trying to attach to $container to capture output"
     if { [catch {$DOCKER($container) inspect $container} descr] } {
 	if { $FWD(-retry) >= 0 } {
 	    docker log DEBUG "No container, retrying in $FWD(-retry) ms"
